@@ -1,0 +1,29 @@
+{
+  "app_bar": {
+    "title": "Flutter Translate Demo"
+  },
+  "language": {
+    "selected_message": "Current language is: {{language}}",
+    "name": {
+      "en": "English",
+      "es": "Spanish",
+      "ar": "Arabic",
+      "ru": "Russian"
+    },
+    "selection": {
+      "title": "Choose Language",
+      "message": "Select a language to continue"
+    }
+  },
+  "button": {
+    "change_language": "Change Language",
+    "cancel": "Cancel"
+  },
+  "plural": {
+    "demo": {
+      "zero": "No clicks yet",
+      "one": "Clicked 1 time",
+      "other": "Clicked {{value}} times"
+    }
+  }
+}
