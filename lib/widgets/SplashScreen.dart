@@ -16,13 +16,11 @@ class _SplashscreenState extends State<Splashscreen> {
 
   final List<String> languages = [
     "English",
-    "French",
-    "Spanish",
-    "German",
-    "Italian",
-    "Portuguese",
-    "Polish",
-    "Romanian"
+    "Português",
+    "Svenska",
+    "Magyar",
+    "Türkçe",
+    "Español",
   ];
 
   void setLocale(Locale locale) {
@@ -74,7 +72,38 @@ class _SplashscreenState extends State<Splashscreen> {
                     color: Colors.black87,
                   ),
                 ),
-
+                  Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.shade700, width: 1.5),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedLanguage,
+                      isExpanded: true,
+                      icon: Icon(Icons.arrow_drop_down, color: Colors.green.shade900),
+                      style: GoogleFonts.montserrat(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade900,
+                      ),
+                      items: languages.map((String lang) {
+                        return DropdownMenuItem<String>(
+                          value: lang,
+                          child: Text(lang),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedLanguage = value!;
+                        });
+                        print("Language Selected: $selectedLanguage");
+                      },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 40),
                  SizedBox(
                   width: double.infinity,
@@ -91,7 +120,7 @@ class _SplashscreenState extends State<Splashscreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              FirstOnboard(),
+                              TutorialScreen(),
                         ),
                       );
                     },
@@ -141,38 +170,7 @@ class _SplashscreenState extends State<Splashscreen> {
                 const SizedBox(height: 16),
 
                 /// ✅ Choose Language Button with Dropdown
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.green.shade700, width: 1.5),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedLanguage,
-                      isExpanded: true,
-                      icon: Icon(Icons.arrow_drop_down, color: Colors.green.shade900),
-                      style: GoogleFonts.montserrat(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green.shade900,
-                      ),
-                      items: languages.map((String lang) {
-                        return DropdownMenuItem<String>(
-                          value: lang,
-                          child: Text(lang),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedLanguage = value!;
-                        });
-                        print("Language Selected: $selectedLanguage");
-                      },
-                    ),
-                  ),
-                ),
+                
 
                 const SizedBox(height: 30),
 

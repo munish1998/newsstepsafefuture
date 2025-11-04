@@ -1,172 +1,356 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:onboarding/onboarding.dart';
-import '/main.dart';
+import 'package:newsstepsafefuture/Screen/dashboard/dashboard.dart';
 
-class FirstOnboard extends StatefulWidget {
-  const FirstOnboard({super.key});
+class TutorialScreen extends StatefulWidget {
+  const TutorialScreen({super.key});
 
   @override
-  State<FirstOnboard> createState() => _FirstOnboardState();
+  State<TutorialScreen> createState() => _TutorialScreenState();
 }
 
-class _FirstOnboardState extends State<FirstOnboard> {
-  int index = 0;
+class _TutorialScreenState extends State<TutorialScreen> {
+  final PageController _pageController = PageController();
+  Locale _locale = const Locale('en');
+  int _currentPage = 0;
+  void setLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
 
-  List<Map<String, String>> pages = [
-    {
-      "title": "Start Learning",
-      "desc": "Tap the 'Start Learning' button to enter your dashboard.",
-    },
-    {
-      "title": "Choose a Topic",
-      "desc": "Water, Waste, Transport, Energy, Eating & Daily Life.",
-    },
-    {
-      "title": "Explore STEAM",
-      "desc":
-          "Every topic includes Science, Technology, Engineering, Arts & Math.",
-    },
-    {
-      "title": "Activities & Games",
-      "desc": "Learn through Essay, Video, Quiz, Game & Challenge.",
-    },
-    {
-      "title": "Keep Exploring",
-      "desc": "Go at your own pace and discover sustainability in daily life.",
-    },
+  final List<TutorialPage> _tutorialPages = [
+    TutorialPage(
+      title: "How NSSF App Works",
+      subtitle: "Learn sustainable choices with STEAM approach",
+      content:
+          "The NSSF App helps you learn how to make smarter and more sustainable choices in your everyday life, using the STEAM approach (Science, Technology, Engineering, Arts, and Mathematics).",
+      icon: Icons.school,
+      color: Colors.blue,
+    ),
+    TutorialPage(
+      title: "1. Start Learning",
+      subtitle: "Begin your sustainability journey",
+      content:
+          "Tap the 'Start Learning' button to enter your personal dashboard where you can track your progress and access all learning materials.",
+      icon: Icons.play_arrow,
+      color: Colors.green,
+    ),
+    TutorialPage(
+      title: "2. Choose a Topic",
+      subtitle: "Six main sustainability topics",
+      content:
+          "You'll see six main topics:\n• Water\n• Waste\n• Transport\n• Energy\n• Eating Habits\n• Daily Life",
+      icon: Icons.category,
+      color: Colors.orange,
+    ),
+    TutorialPage(
+      title: "3. Explore through STEAM",
+      subtitle: "Comprehensive learning approach",
+      content:
+          "Each topic is divided into five sections, one for every STEAM area:\nScience, Technology, Engineering, Arts, and Mathematics.",
+      icon: Icons.explore,
+      color: Colors.purple,
+    ),
+    TutorialPage(
+      title: "4. Learn and Play",
+      subtitle: "Interactive learning activities",
+      content:
+          "Inside each section, you can find different types of content:\n• Essay: Short readings with real-life connections\n• Video: Engaging visual content\n• Quiz: Fun knowledge tests\n• Game: Interactive activities\n• Challenge: Classroom sustainability activities",
+      icon: Icons.games,
+      color: Colors.red,
+    ),
+    TutorialPage(
+      title: "5. Keep Exploring",
+      subtitle: "Learn at your own pace",
+      content:
+          "Move between topics and activities at your own pace, and discover how your daily actions can help create a more sustainable future.",
+      icon: Icons.self_improvement,
+      color: Colors.teal,
+    ),
   ];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _nextPage() {
+    if (_currentPage < _tutorialPages.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Navigate to main app
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(setLocale: setLocale),
+        ),
+      );
+    }
+  }
+
+  void _previousPage() {
+    if (_currentPage > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/gradient.png"),
-            alignment: Alignment.bottomCenter,
-            fit: BoxFit.fitWidth,
-          ),
-        ),
-        child: Onboarding(
-          startIndex: index,
-          swipeableBody:
-              pages.map((p) => _buildPage(p["title"]!, p["desc"]!)).toList(),
-          onPageChanges: (double dragPercent, int pageIndex, int pagesLength,
-              SlideDirection dir) {
-            setState(() => index = pageIndex);
-          },
-          buildFooter: (context, drag, pageIndex, total, setIndex, dir) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: 50.h, left: 20.w, right: 20.w),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Progress Indicator
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _DotsIndicator(
-                    pageIndex: pageIndex,
-                    pagesLength: total,
+                  Text(
+                    "Tutorial",
+                    style: GoogleFonts.mulish(
+                      fontSize: 24.sp,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  InkWell(
-                  onTap: () {
-  final totalPages = total;
-  final newIndex = pageIndex + 1;
+                  Text(
+                    "${_currentPage + 1}/${_tutorialPages.length}",
+                    style: GoogleFonts.mulish(
+                      fontSize: 16.sp,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-  if (newIndex < totalPages) {
-    setState(() => index = newIndex);
-    setIndex(newIndex);
-  } else {
-    /// ✅ Last page reached → Navigate without login
-    // Navigator.pushReplacement(
-    //   context,
-    //   MaterialPageRoute(builder: (_) => const MyHomePage()), // <-- your next screen
-    // );
-  }
-},
+            // Progress Bar
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: LinearProgressIndicator(
+                value: (_currentPage + 1) / _tutorialPages.length,
+                backgroundColor: Colors.white24,
+                color: _tutorialPages[_currentPage].color,
+                minHeight: 4.h,
+              ),
+            ),
 
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 20.w, vertical: 10.h),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
+            SizedBox(height: 20.h),
+
+            // Page View
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _tutorialPages.length,
+                onPageChanged: (int page) {
+                  setState(() {
+                    _currentPage = page;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  return _buildTutorialPage(_tutorialPages[index]);
+                },
+              ),
+            ),
+
+            // Navigation Buttons
+            Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Previous Button
+                  if (_currentPage > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _previousPage,
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 15.h),
+                          side: const BorderSide(color: Colors.white54),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: Text(
+                          "Previous",
+                          style: GoogleFonts.mulish(
+                            fontSize: 16.sp,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  if (_currentPage > 0) SizedBox(width: 10.w),
+
+                  // Next/Get Started Button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _nextPage,
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 15.h),
+                        backgroundColor: _tutorialPages[_currentPage].color,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        elevation: 4,
                       ),
                       child: Text(
-                        pageIndex == total - 1 ? "Get Started" : "Next",
+                        _currentPage == _tutorialPages.length - 1
+                            ? "Get Started"
+                            : "Next",
                         style: GoogleFonts.mulish(
                           fontSize: 16.sp,
-                          color: Colors.black,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
-            );
-          },
+            ),
+
+            // Dots Indicator
+            Padding(
+              padding: EdgeInsets.only(bottom: 20.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _tutorialPages.length,
+                  (index) => Container(
+                    margin: EdgeInsets.symmetric(horizontal: 4.w),
+                    width: _currentPage == index ? 24.w : 8.w,
+                    height: 8.h,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index
+                          ? _tutorialPages[index].color
+                          : Colors.white54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPage(String title, String desc) {
+  Widget _buildTutorialPage(TutorialPage page) {
     return Padding(
-      padding: EdgeInsets.only(top: 120.h, left: 20.w, right: 20.w),
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontFamily: "BankGothic",
-              fontSize: 34.sp,
-              color: Colors.yellow,
+          // Icon Circle
+          Container(
+            width: 120.w,
+            height: 120.w,
+            decoration: BoxDecoration(
+              color: page.color.withOpacity(0.2),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: page.color.withOpacity(0.5),
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              page.icon,
+              size: 50.w,
+              color: page.color,
             ),
           ),
-          SizedBox(height: 20.h),
+
+          SizedBox(height: 40.h),
+
+          // Title
           Text(
-            desc,
-            style: TextStyle(
-              fontSize: 18.sp,
-              height: 1.4,
+            page.title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.mulish(
+              fontSize: 28.sp,
               color: Colors.white,
+              fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
           ),
+
+          SizedBox(height: 10.h),
+
+          // Subtitle
+          Text(
+            page.subtitle,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.mulish(
+              fontSize: 18.sp,
+              color: page.color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          SizedBox(height: 30.h),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Text(
+                page.content,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.mulish(
+                  fontSize: 16.sp,
+                  color: Colors.white70,
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 20.h),
         ],
       ),
     );
   }
 }
 
-/// ✅ Dots Indicator
-class _DotsIndicator extends StatelessWidget {
-  final int pageIndex;
-  final int pagesLength;
+class TutorialPage {
+  final String title;
+  final String subtitle;
+  final String content;
+  final IconData icon;
+  final Color color;
 
-  const _DotsIndicator({
-    super.key,
-    required this.pageIndex,
-    required this.pagesLength,
+  TutorialPage({
+    required this.title,
+    required this.subtitle,
+    required this.content,
+    required this.icon,
+    required this.color,
   });
+}
+
+// Replace with your actual home page
+class MyHomePage extends StatelessWidget {
+  const MyHomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(pagesLength, (i) {
-        bool active = (i == pageIndex);
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: EdgeInsets.symmetric(horizontal: 4.w),
-          height: 8.h,
-          width: active ? 28.w : 10.w,
-          decoration: BoxDecoration(
-            color: active ? Colors.yellow : Colors.white.withOpacity(0.4),
-            borderRadius: BorderRadius.circular(8),
-          ),
-        );
-      }),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Home')),
+      body: const Center(child: Text('Welcome to NSSF App!')),
     );
   }
 }
