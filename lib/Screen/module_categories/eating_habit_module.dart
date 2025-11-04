@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:developer';
 import 'dart:convert';
 import 'package:html/parser.dart' as htmlParser;
 import 'package:newsstepsafefuture/Screen/daily_life_categories/daily_life_art.dart';
 import 'package:newsstepsafefuture/utils/colors.dart';
+import 'package:newsstepsafefuture/widgets/loading_widget.dart';
 
 class EatingHabitModuleScreen extends StatefulWidget {
   final String slug;
@@ -30,13 +32,11 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
     fetchPageData();
   }
 
-  
-
   Future<void> fetchPageData() async {
     try {
       String slugToUse = widget.slug;
       log('slug eating response ===>>>$slugToUse');
-     
+
       if (widget.slug == "eating-habits-science") {
         slugToUse = "eating-habits-science-and-fb";
       }
@@ -89,7 +89,6 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
 
         // Process image URL
         if (imageUrl.startsWith("/")) {
-          
           if (widget.slug == 'water') {
             imageUrl = "https://webpristine.com/nssf" + imageUrl;
           } else {
@@ -125,7 +124,16 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.drawer,
-        title: Text(widget.slug.replaceAll('-', ' ').toTitleCase()),
+        title: Text(
+          widget.slug.replaceAll('-', ' ').toTitleCase(),
+          style: GoogleFonts.montserrat(
+            textStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+          ),
+        ),
         centerTitle: true,
       ),
       body: _buildBody(),
@@ -134,12 +142,8 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
 
   Widget _buildBody() {
     if (isLoading) {
-      return Center(
-        child: SizedBox(
-          width: 50,
-          height: 50,
-          child: Image.asset('assets/images/loading.gif'),
-        ),
+      return LoadingWidget(
+        color: Colors.green,
       );
     }
 
@@ -178,7 +182,6 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
   Widget _buildGridItem(Map<String, String> item) {
     return GestureDetector(
       onTap: () {
-       
         String nextScreenSlug = "${widget.slug}-${item['slug']}";
 
         Navigator.push(
@@ -214,10 +217,8 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
                 height: double.infinity,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Center(
-                  child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                  child: LoadingWidget(
+                    color: Colors.green,
                   ),
                 ),
                 errorWidget: (context, url, error) => Container(
@@ -238,10 +239,13 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
                 child: Text(
                   item['title']!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  style: GoogleFonts.montserrat(
+                    textStyle:
+                        Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white,
+                            ),
                   ),
                 ),
               ),
@@ -252,7 +256,6 @@ class _EatingHabitModuleScreenState extends State<EatingHabitModuleScreen> {
     );
   }
 }
-
 
 extension StringCasingExtension on String {
   String toTitleCase() {

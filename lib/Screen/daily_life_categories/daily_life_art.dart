@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:newsstepsafefuture/utils/colors.dart';
+import 'package:newsstepsafefuture/widget/tabcontent.dart';
+import 'package:newsstepsafefuture/widgets/loading_widget.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -26,20 +29,23 @@ class ContentTab {
   final String type; // 'pdf', 'video', 'quiz', 'game', 'text'
   final String? embedUrl;
   final String? textContent;
+  final String? slug;
 
   ContentTab({
     required this.title,
     required this.type,
     this.embedUrl,
     this.textContent,
+    this.slug
   });
 }
 
 class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
-  bool isLoading = false;
-  String errorMessage = "";
-  int selectedIndex = 0;
-  List<ContentTab> tabs = [];
+  // Replacing with ValueNotifiers
+  final ValueNotifier<bool> isLoading = ValueNotifier(false);
+  final ValueNotifier<String> errorMessage = ValueNotifier("");
+  final ValueNotifier<int> selectedIndex = ValueNotifier(0);
+  final ValueNotifier<List<ContentTab>> tabs = ValueNotifier([]);
 
   List<String> videoLinks = [];
   List<YoutubePlayerController> _videoControllers = [];
@@ -55,14 +61,16 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
     for (var controller in _videoControllers) {
       controller.dispose();
     }
+    isLoading.dispose();
+    errorMessage.dispose();
+    selectedIndex.dispose();
+    tabs.dispose();
     super.dispose();
   }
 
   Future<void> fetchContent() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = "";
-    });
+    isLoading.value = true;
+    errorMessage.value = "";
 
     try {
       final response = await http.get(Uri.parse(
@@ -73,7 +81,7 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
         log('datalist response ===>>>>$dataList');
         log('slug response ===>>>>${widget.slug}');
         log('name response ===>>>>${widget.name}');
-        
+
         if (dataList.isNotEmpty) {
           String rawHtml = dataList[0]['content']['rendered'];
           final document = htmlParser.parse(rawHtml);
@@ -95,20 +103,17 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
               String? contentUrl;
               String? contentText = text;
 
-              // Check for Wordwall game first
               if (iframe != null && iframe.attributes['src'] != null) {
                 contentUrl = iframe.attributes['src'];
                 if (contentUrl!.contains('wordwall.net')) {
                   type = "game";
-                } else if (contentUrl.contains('youtube') || 
-                          contentUrl.contains('youtu.be') || 
-                          contentUrl.contains('vimeo')) {
+                } else if (contentUrl.contains('youtube') ||
+                    contentUrl.contains('youtu.be') ||
+                    contentUrl.contains('vimeo')) {
                   type = "video";
                   videoLinks.add(contentUrl);
                 }
-              }
-              // Then check for Kahoot quiz or PDF
-              else if (embed != null && embed.attributes['src'] != null) {
+              } else if (embed != null && embed.attributes['src'] != null) {
                 contentUrl = _completePdfUrl(embed.attributes['src'] ?? '');
                 if (contentUrl.contains('kahoot.it')) {
                   type = "quiz";
@@ -126,10 +131,8 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
             }
           }
 
-          setState(() {
-            tabs = extractedTabs;
-            isLoading = false;
-          });
+          tabs.value = extractedTabs;
+          isLoading.value = false;
         } else {
           throw Exception('No data found.');
         }
@@ -137,10 +140,8 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
         throw Exception('Failed to load data.');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = "Error fetching data: ${e.toString()}";
-      });
+      isLoading.value = false;
+      errorMessage.value = "Error fetching data: ${e.toString()}";
     }
   }
 
@@ -153,378 +154,123 @@ class _DailyLifeArtScreenState extends State<DailyLifeArtScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.slug),
+        title: Text(
+          widget.slug,
+          style: GoogleFonts.montserrat(
+            textStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w400,
+                  color: Colors.black,
+                ),
+          ),
+        ),
         centerTitle: true,
         backgroundColor: AppColors.drawer,
       ),
       body: RefreshIndicator(
         onRefresh: fetchContent,
-        child: Column(
-          children: [
-            if (tabs.isNotEmpty)
-              Container(
-                padding: EdgeInsets.all(10),
-                color: Colors.blue[50],
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(tabs.length, (index) {
-                      return GestureDetector(
-                        onTap: () => setState(() => selectedIndex = index),
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          margin: EdgeInsets.symmetric(horizontal: 4),
-                          padding: EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: selectedIndex == index
-                                ? AppColors.drawer
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: selectedIndex == index
-                                ? [
-                                    BoxShadow(
-                                        color: Colors.blue.withOpacity(0.5),
-                                        blurRadius: 5)
-                                  ]
-                                : [],
-                          ),
-                          child: Text(
-                            tabs[index].title,
-                            style: TextStyle(
-                              color: selectedIndex == index
-                                  ? Colors.white
-                                  : Colors.black,
-                              fontWeight: FontWeight.bold,
+        child: ValueListenableBuilder<bool>(
+          valueListenable: isLoading,
+          builder: (context, loading, _) {
+            return ValueListenableBuilder<String>(
+              valueListenable: errorMessage,
+              builder: (context, error, _) {
+                return ValueListenableBuilder<List<ContentTab>>(
+                  valueListenable: tabs,
+                  builder: (context, tabList, _) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: selectedIndex,
+                      builder: (context, index, _) {
+                        return Column(
+                          children: [
+                            if (tabList.isNotEmpty)
+                              Container(
+                                padding: EdgeInsets.all(10),
+                                color: Colors.blue[50],
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: List.generate(tabList.length,
+                                        (tabIndex) {
+                                      return GestureDetector(
+                                        onTap: () =>
+                                            selectedIndex.value = tabIndex,
+                                        child: AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          margin: const EdgeInsets.symmetric(
+                                              horizontal: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12, horizontal: 16),
+                                          decoration: BoxDecoration(
+                                            color: index == tabIndex
+                                                ? AppColors.drawer
+                                                : Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            boxShadow: index == tabIndex
+                                                ? [
+                                                    BoxShadow(
+                                                      color: Colors.blue
+                                                          .withOpacity(0.5),
+                                                      blurRadius: 5,
+                                                    )
+                                                  ]
+                                                : [],
+                                          ),
+                                          child: Text(
+                                            tabList[tabIndex].title,
+                                            style: GoogleFonts.montserrat(
+                                              textStyle: Theme.of(context)
+                                                  .textTheme
+                                                  .headlineSmall
+                                                  ?.copyWith(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: index == tabIndex
+                                                        ? Colors.white
+                                                        : Colors.black,
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ),
+                                ),
+                              ),
+                            Expanded(
+                              child: loading
+                                  ? LoadingWidget(color: Colors.green,)
+                                  : error.isNotEmpty
+                                      ? Center(
+                                          child: Text(
+                                            error,
+                                            style:
+                                                const TextStyle(color: Colors.red),
+                                          ),
+                                        )
+                                      : tabList.isEmpty
+                                          ? const Center(
+                                              child:
+                                                  Text("No content available"))
+                                          : DynamicTabBuilder.buildDynamicTabContent(
+                                              context,
+                                              tabList[index],
+                                              videoLinks,
+                                              _videoControllers,
+                                            ),
                             ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-            Expanded(
-              child: isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : errorMessage.isNotEmpty
-                      ? Center(
-                          child: Text(errorMessage,
-                              style: TextStyle(color: Colors.red)),
-                        )
-                      : tabs.isEmpty
-                          ? Center(child: Text("No content available"))
-                          : _buildDynamicTabContent(tabs[selectedIndex]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDynamicTabContent(ContentTab tab) {
-    // Special handling for Wordwall URLs
-    if (tab.embedUrl != null && tab.embedUrl!.contains('wordwall.net')) {
-      return _buildGameViewer(tab);
-    }
-
-    switch (tab.type) {
-      case 'pdf':
-        return _buildPdfViewer(tab);
-      case 'quiz':
-        return _buildQuizViewer(tab);
-      case 'game':
-        return _buildGameViewer(tab);
-      case 'video':
-        return _buildVideoTab();
-      case 'text':
-      default:
-        return _buildTextView(tab);
-    }
-  }
-
-  Widget _buildPdfViewer(ContentTab tab) {
-    if (tab.embedUrl == null) return Center(child: Text("No PDF available"));
-    
-    String urlToLoad = _pdfViewerUrl(tab.embedUrl!);
-    
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Card(
-        elevation: 6,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.drawer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  topRight: Radius.circular(15),
-                ),
-              ),
-              child: Text(
-                tab.title,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            Expanded(
-              child: WebViewWidget(
-                controller: WebViewController()
-                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                  ..loadRequest(Uri.parse(urlToLoad)),
-            ),
-        )],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuizViewer(ContentTab tab) {
-    if (tab.embedUrl == null) return Center(child: Text("No quiz available"));
-    
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Card(
-        elevation: 6,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.drawer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  topRight: Radius.circular(15),
-                ),
-              ),
-              child: Text(
-                tab.title,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.75,
-              child: WebViewWidget(
-                controller: WebViewController()
-                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                  ..loadRequest(Uri.parse(tab.embedUrl!)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGameViewer(ContentTab tab) {
-    if (tab.embedUrl == null) return Center(child: Text("No game available"));
-    
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Card(
-        elevation: 6,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.drawer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  topRight: Radius.circular(15),
-                ),
-              ),
-              child: Text(
-                tab.title,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            Expanded(
-              child: WebViewWidget(
-                controller: WebViewController()
-                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                  ..setBackgroundColor(Colors.transparent)
-                  ..setNavigationDelegate(
-                    NavigationDelegate(
-                      onPageFinished: (String url) {
-                        log('Wordwall game loaded: $url');
+                          ],
+                        );
                       },
-                    ),
-                  )
-                  ..loadRequest(Uri.parse(tab.embedUrl!)),
-              ),
-            ),
-          ],
+                    );
+                  },
+                );
+              },
+            );
+          },
         ),
       ),
     );
-  }
-
-  Widget _buildVideoTab() {
-    if (videoLinks.isEmpty) {
-      return const Center(child: Text("No videos available."));
-    }
-
-    return ListView.builder(
-      itemCount: videoLinks.length,
-      itemBuilder: (context, index) {
-        String? videoId = YoutubePlayer.convertUrlToId(videoLinks[index]);
-        if (videoId == null) {
-          return const SizedBox();
-        }
-
-        if (_videoControllers.length <= index) {
-          _videoControllers.add(
-            YoutubePlayerController(
-              initialVideoId: videoId,
-              flags: const YoutubePlayerFlags(
-                autoPlay: false,
-                mute: false,
-                enableCaption: true,
-                captionLanguage: 'en',
-                hideControls: false,
-                controlsVisibleAtStart: true,
-                disableDragSeek: false,
-                forceHD: true,
-              ),
-            ),
-          );
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: YoutubePlayer(
-            key: ValueKey(videoId),
-            controller: _videoControllers[index],
-            showVideoProgressIndicator: true,
-            progressColors: const ProgressBarColors(
-              playedColor: Colors.red,
-              handleColor: Colors.redAccent,
-              bufferedColor: Colors.grey,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTextView(ContentTab tab) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              blurRadius: 8,
-              spreadRadius: 2,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (tab.title.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  tab.title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[800],
-                  ),
-                ),
-              ),
-            ..._extractTextParagraphs(tab.textContent),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _extractTextParagraphs(String? content) {
-    if (content == null || content.trim().isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            "No content available",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        )
-      ];
-    }
-
-    final lines = content.split('\n').where((line) => line.trim().isNotEmpty).toList();
-    
-    return lines.map((line) {
-      TextStyle style = TextStyle(
-        fontSize: 15,
-        color: Colors.grey[800],
-        height: 1.5,
-      );
-
-      if (line.toLowerCase().contains("round 1") ||
-          line.toLowerCase().contains("round 2") ||
-          line.toLowerCase().contains("round 3") ||
-          line.toLowerCase().contains("round 4") ||
-          line.toLowerCase().contains("final presentation") ||
-          line.toLowerCase().contains("learning outcomes")) {
-        style = style.copyWith(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.teal[800],
-        );
-      } else if (line.trim().startsWith('📌') || 
-                 line.trim().startsWith('✅') || 
-                 line.trim().startsWith('🎯')) {
-        style = style.copyWith(
-          fontWeight: FontWeight.w600,
-          color: Colors.blue[700],
-        );
-      } else if (line.trim().startsWith('💡') || 
-                 line.trim().startsWith('🕹') || 
-                 line.trim().startsWith('🔹')) {
-        style = style.copyWith(
-          fontWeight: FontWeight.w600,
-          color: Colors.purple[700],
-        );
-      }
-
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (line.trim().startsWith('•'))
-              Padding(
-                padding: const EdgeInsets.only(right: 8, top: 2),
-                child: Text('•', style: style),
-              ),
-            Expanded(
-              child: Text(
-                line.trim().replaceAll('•', ''),
-                style: style,
-              ),
-            ),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-  String _pdfViewerUrl(String pdfUrl) {
-    return "https://docs.google.com/viewer?url=$pdfUrl&embedded=true";
   }
 }

@@ -1,7 +1,5 @@
 import 'dart:developer';
-
 import 'package:flutter/material.dart';
-import 'package:newsstepsafefuture/utils/colors.dart';
 
 class LanguageDropdown extends StatefulWidget {
   final Locale currentLocale;
@@ -39,72 +37,68 @@ class _LanguageDropdownState extends State<LanguageDropdown> {
   @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> languages = [
-      {
-        'locale': Locale('en'),
-        'name': 'English',
-        'flag': '🇬🇧',
-      },
-      {
-        'locale': Locale('pt'),
-        'name': 'Português',
-        'flag': '🇵🇹',
-      },
-      {
-        'locale': Locale('sv'),
-        'name': 'Svenska',
-        'flag': '🇸🇪',
-      },
-      {
-        'locale': Locale('hu'),
-        'name': 'Magyar',
-        'flag': '🇭🇺',
-      },
-      {
-        'locale': Locale('tr'),
-        'name': 'Türkçe',
-        'flag': '🇹🇷',
-      },
-      {
-        'locale': Locale('es'),
-        'name': 'Español',
-        'flag': '🇪🇸',
-      },
-      {
-        'locale': Locale('eu'),
-        'name': 'Euskara',
-        'flag': Image.asset(
-          'assets/images/eu.png', // Ensure this image exists
-          width: 24,
-          height: 16,
-          fit: BoxFit.contain,
-        ),
-      },
+      {'locale': const Locale('en'), 'flag': '🇬🇧', 'name': 'English'},
+      {'locale': const Locale('pt'), 'flag': '🇵🇹', 'name': 'Português'},
+      {'locale': const Locale('sv'), 'flag': '🇸🇪', 'name': 'Svenska'},
+      {'locale': const Locale('hu'), 'flag': '🇭🇺', 'name': 'Magyar'},
+      {'locale': const Locale('tr'), 'flag': '🇹🇷', 'name': 'Türkçe'},
+      {'locale': const Locale('es'), 'flag': '🇪🇸', 'name': 'Español'},
     ];
+
+    // Ensure dropdown value exists in items
+    Locale selectedValue = languages
+        .firstWhere(
+          (lang) => lang['locale'].languageCode == _selectedLocale.languageCode,
+          orElse: () => languages[0],
+        )['locale'];
 
     return DropdownButtonHideUnderline(
       child: DropdownButton<Locale>(
-        value: _selectedLocale,
+        value: selectedValue,
+        dropdownColor: Colors.white,
+
+        /// 👇 This controls how the selected item is displayed
+        selectedItemBuilder: (BuildContext context) {
+          return languages.map((lang) {
+            return Center(
+              child: Text(
+                lang['flag'],
+                style: const TextStyle(fontSize: 22),
+              ),
+            );
+          }).toList();
+        },
+
+        /// 👇 Dropdown menu items (flag + text)
         items: languages.map((lang) {
-          return DropdownMenuItem<Locale>(
-            
-            value: lang['locale'],
-            child: Row(
-              children: [
-                lang['flag'] is String
-                    ? Text(lang['flag'], style: TextStyle(fontSize: 20))
-                    : lang['flag'], // for image-based flag
-                SizedBox(width: 5),
-                Text(lang['name']),
-              ],
-            ),
-          );
+          return
+         DropdownMenuItem<Locale>(
+  value: lang['locale'],
+  child: Row(
+    children: [
+      Text(lang['flag'], style: const TextStyle(fontSize: 20)),
+      const SizedBox(width: 8),
+      Flexible(
+        child: Text(
+          lang['name'],
+          style: const TextStyle(fontSize: 16),
+          overflow: TextOverflow.ellipsis, // ✅ prevent overflow
+          maxLines: 1,
+        ),
+      ),
+    ],
+  ),
+);
+
         }).toList(),
+
         onChanged: (Locale? newLocale) {
           if (newLocale != null) {
             setState(() {
               _selectedLocale = newLocale;
             });
             widget.onLocaleChange(newLocale);
+            log('Selected language: ${newLocale.languageCode}');
           }
         },
       ),

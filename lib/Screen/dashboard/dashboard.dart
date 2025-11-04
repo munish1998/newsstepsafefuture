@@ -8,36 +8,35 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:newsstepsafefuture/Screen/module_categories/eating_habit_module.dart';
+import 'package:newsstepsafefuture/common/widget/custom_top_widget.dart';
 import 'package:newsstepsafefuture/dropdown_language/language.dart';
+import 'package:newsstepsafefuture/providers/font_provider.dart';
+import 'package:newsstepsafefuture/widgets/loading_widget.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:translator/translator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:newsstepsafefuture/utils/colors.dart';
 
-class WebPageScreen extends StatefulWidget {
+class HomeScreen extends StatefulWidget {
   final Function(Locale) setLocale;
-  const WebPageScreen({super.key, required this.setLocale});
+  const HomeScreen({super.key, required this.setLocale});
+
   @override
-  _WebPageScreenState createState() => _WebPageScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _WebPageScreenState extends State<WebPageScreen> {
-  List<Map<String, String>> titleImageList = [];
-  List categories = [];
-  bool isLoading = true;
-  bool isTranslating = false;
-
-  String pageTitle = "NEW STEPS SAFE FUTURE";
-  String introDescription = "";
-  String webPortalHeading = "";
-  String webPortalContent = "";
+class _HomeScreenState extends State<HomeScreen> {
+  final ValueNotifier<bool> _isLoading = ValueNotifier(true);
+  final ValueNotifier<bool> _isTranslating = ValueNotifier(false);
+  final ValueNotifier<Map<String, dynamic>> _pageData = ValueNotifier({});
 
   final String baseUrl = "https://webpristine.com/nssf";
   final String baseUrl1 = "https://webpristine.com/";
   final translator = GoogleTranslator();
   final String _cacheKey = "web_page_translations";
 
-  Locale? _currentLocale;
+  Locale _currentLocale = const Locale("en");
   SharedPreferences? _prefs;
 
   @override
@@ -48,24 +47,15 @@ class _WebPageScreenState extends State<WebPageScreen> {
   }
 
   Future<void> _initializeApp() async {
-    try {
-      await _initSharedPreferences();
-      await fetchPageData();
-    } catch (e, stack) {
-      log("Initialization error: $e\n$stack");
-      await fetchPageData();
-    }
+    await _initSharedPreferences();
+    await fetchPageData();
   }
 
   Future<void> _initSharedPreferences() async {
     try {
       _prefs = await SharedPreferences.getInstance();
     } on PlatformException catch (e) {
-      log("SharedPreferences initialization failed: ${e.message}");
-      _prefs = null;
-    } catch (e, stack) {
-      log("Error initializing SharedPreferences: $e\n$stack");
-      _prefs = null;
+      log("SharedPreferences error: ${e.message}");
     }
   }
 
@@ -77,58 +67,12 @@ class _WebPageScreenState extends State<WebPageScreen> {
         .trim();
   }
 
-  Future<bool> _loadCachedTranslations() async {
-    if (_prefs == null) return false;
-
-    try {
-      final langCode = _currentLocale?.languageCode ?? 'en';
-      final cachedData = _prefs!.getString('$_cacheKey-$langCode');
-
-      if (cachedData != null) {
-        final data = json.decode(cachedData);
-        setState(() {
-          pageTitle =
-              _formatTitle(data['pageTitle'] ?? "NEW STEPS SAFE FUTURE");
-          introDescription = data['introDescription'] ?? introDescription;
-          webPortalHeading = data['webPortalHeading'] ?? webPortalHeading;
-          webPortalContent = data['webPortalContent'] ?? webPortalContent;
-          titleImageList = List<Map<String, String>>.from(
-              json.decode(data['titleImageList'] ?? '[]'));
-        });
-        return true;
-      }
-    } on PlatformException catch (e) {
-      log("Failed to load cached translations: ${e.message}");
-    } catch (e, stack) {
-      log("Error loading cached translations: $e\n$stack");
-    }
-    return false;
-  }
-
-  Future<void> _saveTranslationsToCache(
-      String langCode, Map<String, String> data) async {
-    if (_prefs == null) return;
-
-    try {
-      await _prefs!.setString('$_cacheKey-$langCode', json.encode(data));
-    } on PlatformException catch (e) {
-      log("Failed to save translations: ${e.message}");
-    } catch (e, stack) {
-      log("Error saving translations: $e\n$stack");
-    }
-  }
-
   Future<void> fetchPageData() async {
-    setState(() => isLoading = true);
-
+    _isLoading.value = true;
     try {
-      if (await _loadCachedTranslations()) {
-        setState(() => isLoading = false);
-        return;
-      }
-
       final response =
           await http.get(Uri.parse('$baseUrl/wp-json/wp/v2/pages/18'));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final document = htmlParser.parse(data['content']['rendered']);
@@ -137,9 +81,7 @@ class _WebPageScreenState extends State<WebPageScreen> {
         String extractedTitle = "NEW STEPS SAFE FUTURE";
         if (h1Tag != null) {
           final pTag = h1Tag.querySelector('p');
-          if (pTag != null) {
-            extractedTitle = _formatTitle(pTag.text);
-          }
+          if (pTag != null) extractedTitle = _formatTitle(pTag.text);
         }
 
         final introParagraph = document.querySelector('div > p');
@@ -153,9 +95,7 @@ class _WebPageScreenState extends State<WebPageScreen> {
           final titleTag = item.querySelector('h3');
           if (imgTag != null && titleTag != null) {
             String imageUrl = imgTag.attributes['src'] ?? '';
-            if (imageUrl.startsWith("/")) {
-              imageUrl = "$baseUrl1$imageUrl";
-            }
+            if (imageUrl.startsWith("/")) imageUrl = "$baseUrl1$imageUrl";
             fetchedList.add({
               "title": titleTag.text.trim(),
               "imageUrl": imageUrl,
@@ -173,119 +113,20 @@ class _WebPageScreenState extends State<WebPageScreen> {
             ? webPortalDescription.map((e) => e.text.trim()).join("\n\n")
             : "";
 
-        setState(() {
-          pageTitle = extractedTitle;
-          introDescription = introText;
-          titleImageList = fetchedList;
-          categories = fetchedCategories;
-          webPortalHeading = webPortalTitle;
-          webPortalContent = webPortalText;
-        });
-
-        await _saveTranslationsToCache('en', {
-          'pageTitle': extractedTitle,
-          'introDescription': introText,
-          'webPortalHeading': webPortalTitle,
-          'webPortalContent': webPortalText,
-          'titleImageList': json.encode(fetchedList),
-        });
-
-        if (_currentLocale?.languageCode != 'en') {
-          await translateAllData(_currentLocale?.languageCode ?? 'en');
-        }
-      } else {
-        throw Exception('Failed to load page data');
+        _pageData.value = {
+          "pageTitle": extractedTitle,
+          "introDescription": introText,
+          "titleImageList": fetchedList,
+          "categories": fetchedCategories,
+          "webPortalHeading": webPortalTitle,
+          "webPortalContent": webPortalText,
+        };
       }
-    } catch (e, stack) {
-      log("Error fetching page data: $e\n$stack");
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load data. Please try again.')));
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
-    }
-  }
-
-  Future<void> translateAllData(String langCode) async {
-    if (await _loadCachedTranslations()) return;
-
-    setState(() => isTranslating = true);
-
-    try {
-      // Explicitly declare the types for each future
-      final List<Future<String>> translationFutures = [
-        translateText(pageTitle, langCode),
-        translateText(introDescription, langCode),
-        translateText(webPortalHeading, langCode),
-        translateText(webPortalContent, langCode),
-      ];
-
-      // Wait for all string translations first
-      final List<String> translations = await Future.wait(translationFutures);
-
-      // Then translate the titleImageList separately
-      final List<Map<String, String>> translatedList =
-          await _translateTitleImageList(langCode);
-
-      setState(() {
-        pageTitle = translations[0];
-        introDescription = translations[1];
-        webPortalHeading = translations[2];
-        webPortalContent = translations[3];
-        titleImageList = translatedList;
-      });
-
-      await _saveTranslationsToCache(langCode, {
-        'pageTitle': translations[0],
-        'introDescription': translations[1],
-        'webPortalHeading': translations[2],
-        'webPortalContent': translations[3],
-        'titleImageList': json.encode(translatedList),
-      });
-    } catch (e, stack) {
-      log("Translation error: $e\n$stack");
-    } finally {
-      if (mounted) {
-        setState(() => isTranslating = false);
-      }
-    }
-  }
-
-  Future<List<Map<String, String>>> _translateTitleImageList(
-      String langCode) async {
-    List<Map<String, String>> translatedList = [];
-    for (var item in titleImageList) {
-      translatedList.add({
-        'title': await translateText(item['title']!, langCode),
-        'imageUrl': item['imageUrl']!,
-      });
-    }
-    return translatedList;
-  }
-
-  Future<String> translateText(String text, String toLanguageCode) async {
-    try {
-      if (text.trim().isEmpty ||
-          RegExp(r'^\d+$').hasMatch(text) ||
-          text.length < 3) {
-        return text;
-      }
-      var translated = await translator.translate(text, to: toLanguageCode);
-      return translated.text;
     } catch (e) {
-      log("Translation failed for: $text\nError: $e");
-      return text;
+      log("Error fetching page data: $e");
+    } finally {
+      _isLoading.value = false;
     }
-  }
-
-  void onCategoryTap(String slug) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EatingHabitModuleScreen(slug: slug),
-      ),
-    );
   }
 
   void _launchURL(String url) async {
@@ -297,6 +138,7 @@ class _WebPageScreenState extends State<WebPageScreen> {
 
   void _navigateToWebsite(String image) {
     String url = switch (image) {
+      "assets/images/nsp.png" => "https://https://oveges.hu/",
       "assets/images/nsp2.png" => "https://sinnovations.org/",
       "assets/images/nsp3.png" => "https://gamarra.eus/",
       "assets/images/nsp4.png" => "https://start.stockholm/",
@@ -309,262 +151,211 @@ class _WebPageScreenState extends State<WebPageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = Localizations.localeOf(context);
-
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.drawer,
-        elevation: 0,
-        leadingWidth: 60.w, // consistent space for logo
-        leading: Padding(
-            padding: EdgeInsets.only(left: 8.w),
-            child: CircleAvatar(
-              // radius: 90.w,
-              backgroundColor: Colors.transparent,
-              child: ClipOval(
-                child: Image.network(
-                  "https://newstepssafefuture.eu/wp-content/themes/yootheme/cache/da/NSSF-Ultimate-logo-1-daee3d7e.webp",
-                  width: 70.w,
-                  height: 70.w,
-                  //fit: BoxFit.cover,
-                  loadingBuilder: (BuildContext context, Widget child,
-                      ImageChunkEvent? loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    );
-                  },
-                  errorBuilder: (BuildContext context, Object exception,
-                      StackTrace? stackTrace) {
-                    return Container(
-                      width: 100.w,
-                      height: 100.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[200],
-                      ),
-                      child: Icon(Icons.error, color: Colors.grey),
-                    );
-                  },
-                ),
-              ),
-            )),
-        titleSpacing: 0,
+      body: ValueListenableBuilder<bool>(
+        valueListenable: _isLoading,
+        builder: (context, isLoading, _) {
+          if (isLoading) return LoadingWidget(color: Colors.green);
 
-        centerTitle: true, // centers title between leading & actions
-        actions: [
-          Padding(
-            padding: EdgeInsets.only(left: 9.w),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 90.w,
-                  child: LanguageDropdown(
-                    currentLocale: currentLocale,
-                    onLocaleChange: (locale) {
-                      widget.setLocale(locale);
-                      _currentLocale = locale;
-                      translateAllData(locale.languageCode);
-                      log('Selected language: ${locale.languageCode}');
-                    },
-                  ),
-                ),
-                SizedBox(width: 6.w),
-                IconButton(
-                  icon: Image.asset("assets/images/linkedin.png", width: 24.w),
-                  onPressed: () => _launchURL('https://www.linkedin.com/'),
-                  padding: EdgeInsets.zero,
-                ),
-                IconButton(
-                  icon: Image.asset("assets/images/facebook.png", width: 24.w),
-                  onPressed: () => _launchURL('https://www.facebook.com/'),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      body: isLoading || isTranslating
-          ? Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: fetchPageData,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.all(10.w),
+          return ValueListenableBuilder<Map<String, dynamic>>(
+            valueListenable: _pageData,
+            builder: (context, data, _) {
+              final title = data["pageTitle"] ?? "";
+              final intro = data["introDescription"] ?? "";
+              final webHeading = data["webPortalHeading"] ?? "";
+              final webContent = data["webPortalContent"] ?? "";
+              final list =
+                  List<Map<String, String>>.from(data["titleImageList"] ?? []);
+              final categories =
+                  List<Map<String, dynamic>>.from(data["categories"] ?? []);
+
+              return RefreshIndicator(
+                onRefresh: fetchPageData,
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 30),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        pageTitle,
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontSize: 22.54,
-                          fontWeight: FontWeight.w400,
-                          height: 1.5,
-                          color: Colors.black,
-                        ),
+                      CustomTopBar(
+                        currentLocale: _currentLocale,
+                        onLocaleChange: (locale) {
+                          widget.setLocale(locale);
+                          _currentLocale = locale;
+                        },
                       ),
-                      SizedBox(height: 10.h),
+                      SizedBox(height: 20),
                       Text(
-                        introDescription,
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.montserrat(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF6C6D74),
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  fontSize: 18),
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 20.h),
-                      titleImageList.isEmpty
-                          ? Center(
-                              child: SizedBox(
-                                width: 50,
-                                height: 50,
-                                child: Image.asset('assets/images/loading.gif'),
-                              ),
-                            )
+                      SizedBox(height: 10),
+                      Text(
+                        intro,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.montserrat(
+                          color: Colors.black,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      list.isEmpty
+                          ? LoadingWidget(color: Colors.green)
                           : GridView.builder(
                               shrinkWrap: true,
                               physics: NeverScrollableScrollPhysics(),
                               gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
-                                mainAxisSpacing: 10.h,
-                                crossAxisSpacing: 10.w,
-                                childAspectRatio: 1.1,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
                               ),
-                              itemCount: titleImageList.length,
+                              itemCount: list.length,
                               itemBuilder: (context, index) {
                                 return _buildGridItem(
-                                    titleImageList[index], categories[index]);
+                                  list[index],
+                                  categories[index],
+                                );
                               },
                             ),
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 20),
                       Text(
-                        webPortalHeading,
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontSize: 26.54,
-                          fontWeight: FontWeight.w400,
-                          height: 1.5,
-                          color: Colors.black,
-                        ),
-                      ),
-                      SizedBox(height: 10.h),
-                      Text(
-                        webPortalContent,
+                        webHeading,
                         style: GoogleFonts.montserrat(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF6C6D74),
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .headlineLarge
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  fontSize: 18),
                         ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        webContent,
                         textAlign: TextAlign.center,
+                        style: GoogleFonts.montserrat(
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  fontSize: 15),
+                        ),
                       ),
-                      SizedBox(height: 30.h),
-                      Text("Coordinator",
-                          style: TextStyle(
-                              fontSize: 18.sp, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 10.h),
-                      Image.asset(
-                        'assets/images/nsp.png',
-                        width: 105.w,
-                        height: 105.h,
+                      SizedBox(height: 30),
+                      Text(
+                        "Coordinator",
+                        style: GoogleFonts.montserrat(
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black),
+                        ),
                       ),
-                      // _buildImageRow(["assets/images/nsp.png"]),
-                      SizedBox(height: 20.h),
-                      Text("Partners",
-                          style: TextStyle(
-                              fontSize: 18.sp, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 10.h),
+                      SizedBox(height: 10),
+                      GestureDetector(
+                          onTap: () {
+                            _navigateToWebsite('assets/images/nsp.png');
+                          },
+                          child: Image.asset(
+                            "assets/images/nsp.png",
+                          )),
+                      SizedBox(height: 20),
+                      Text(
+                        "Partners",
+                        style: GoogleFonts.montserrat(
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  fontSize: 18),
+                        ),
+                      ),
+                      SizedBox(height: 10),
                       _buildImageRow([
                         "assets/images/nsp2.png",
                         "assets/images/nsp3.png",
                         "assets/images/nsp4.png"
                       ]),
-                      _buildImageRoww(
+                      _buildImageRow(
                           ["assets/images/nsp5.png", "assets/images/nsp6.png"]),
-                      SizedBox(height: 30.h),
                     ],
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildGridItem(Map<String, String> item, Map category) {
-    final dynamic categorySlug = category['slug'];
-    final String slug = categorySlug is String
-        ? categorySlug
-        : item['title']!.toLowerCase().replaceAll(' ', '-');
-
-    String imageUrl = item['imageUrl'] ?? '';
-    if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
-    if (imageUrl.startsWith('/')) imageUrl = 'https://webpristine.com$imageUrl';
+    final String slug =
+        (category['slug'] ?? item['title']!.toLowerCase().replaceAll(' ', '-'))
+            .toString();
 
     return GestureDetector(
-      onTap: () => onCategoryTap(slug),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EatingHabitModuleScreen(slug: slug),
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 2)
-          ],
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
         ),
         child: Stack(
-          alignment: Alignment.center,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                width: double.infinity,
-                height: double.infinity,
+                imageUrl: item["imageUrl"] ?? "",
                 fit: BoxFit.cover,
-                placeholder: (context, url) =>
-                    Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey[200],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text('Image not available',
-                          style: TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                ),
+                placeholder: (_, __) => LoadingWidget(color: Colors.green),
+                errorWidget: (_, __, ___) =>
+                    Icon(Icons.broken_image, color: Colors.grey),
               ),
             ),
             Positioned(
-              bottom: 10,
+              bottom: 0,
               left: 0,
               right: 0,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                margin: EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                color: Colors.black54,
+                padding: EdgeInsets.all(8),
                 child: Text(
-                  item['title']!,
+                  item["title"] ?? "",
+                  style: GoogleFonts.montserrat(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
                   textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
                 ),
               ),
             ),
@@ -574,35 +365,20 @@ class _WebPageScreenState extends State<WebPageScreen> {
     );
   }
 
-  Widget _buildImageRow(
-    List<String> imagePaths,
-  ) {
+  Widget _buildImageRow(List<String> images) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: imagePaths.map((image) {
-        return GestureDetector(
-          onTap: () => _navigateToWebsite(image),
-          child: Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Image.asset(image, width: 105.w, height: 105.h),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildImageRoww(List<String> imagePaths) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: imagePaths.map((image) {
-        return GestureDetector(
-          onTap: () => _navigateToWebsite(image),
-          child: Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Image.asset(image, width: 105.w, height: 105.h),
-          ),
-        );
-      }).toList(),
+      children: images
+          .map(
+            (img) => GestureDetector(
+              onTap: () => _navigateToWebsite(img),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Image.asset(img, width: 100, height: 100),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }
